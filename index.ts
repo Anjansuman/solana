@@ -1,1 +1,3 @@
-console.log("Hello via Bun!");
+import init from "./services/init";
+
+init();
