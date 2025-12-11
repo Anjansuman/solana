@@ -1,27 +1,27 @@
+import BlockShape from "../metadata/block.metadata";
 import type BlockType from "../types/block.type";
 
 
-export default class Block {
+export default class Block extends BlockShape {
 
-    public create(prevBlock?: BlockType) {
+    public create(prev_block?: BlockType): BlockType {
 
         const timestamp = new Date();
-        const block_hash = prevBlock ? this.create_hash(prevBlock.hash + timestamp) : this.create_hash(timestamp.toString());
         
         // if prev block is not provided that means, starting of the chain
         const new_block: BlockType = {
-            index: prevBlock ? prevBlock.index + 1 : 0,
+            index: prev_block ? prev_block.index + 1 : 0,
             timestamp: timestamp,
             transactions: [],
-            previousHash: prevBlock ? prevBlock.previousHash : '0',
-            hash: 'to be filled',
+            previousHash: prev_block ? prev_block.hash : '0',
+            hash: '',
         };
 
         return new_block;
 
     }
 
-    private create_hash(input: string): string {
+    protected create_hash(input: string): string {
         return Bun.SHA256.hash(input, 'hex');
     }
 
