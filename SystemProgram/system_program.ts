@@ -25,7 +25,7 @@ export default class SystemProgram {
 
         if(new_acc) return { ok: false, err: 'Account already exists' };
 
-        if(lamports < 0) return { ok: false, err: 'Invalid lamports' };
+        if(lamports <= 0) return { ok: false, err: 'Invalid lamports' };
 
         if(payer.lamports < lamports) return { ok: false, err: 'Insufficient lamports in payer' };
 
@@ -60,8 +60,8 @@ export default class SystemProgram {
         const from_meta = ctx.metas.get(from_address);
         const to_meta = ctx.metas.get(to_address);
 
-        if(!from_meta || from_meta.isWritable) return { ok: false, err: `Address: ${from_address} must be writable` };
-        if(!to_meta || to_meta.isWritable) return { ok: false, err: `Address: ${to_address} must be writable` };
+        if(!from_meta || !from_meta.isWritable) return { ok: false, err: `Address: ${from_address} must be writable` };
+        if(!to_meta || !to_meta.isWritable) return { ok: false, err: `Address: ${to_address} must be writable` };
 
         if(!from_meta.isSigner) return { ok: false, err: `Address: ${from_address} must be the signer` };
 
