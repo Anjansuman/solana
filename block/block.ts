@@ -18,7 +18,6 @@ export default class Block extends BlockShape {
         };
 
         return new_block;
-
     }
 
     protected create_hash(input: string): string {

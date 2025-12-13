@@ -1,15 +1,15 @@
 import chalk from "chalk";
-import init, { blockchain, runtime } from "./services/init";
+import init, { blockchain, init_wallets, runtime } from "./services/init";
 import Transaction from "./transaction/transaction";
 
 init();
 
 
-const tx = Transaction.transfer(
-    'Alice',
-    'Bob',
+const tx = Transaction.create(
+    init_wallets.alice,
+    init_wallets.bob.public_key,
     100n,
-    'GENESIS_HASH',
+    blockchain.get_recent_block_hash().hash!,
 );
 
 const result = runtime.execute_transaction(tx);
@@ -22,5 +22,5 @@ if(!result.ok) {
 blockchain.add_transaction(tx);
 blockchain.finalize();
 
-console.log(chalk.blue('Alice: '), runtime['account_store'].get('Alice'));
-console.log(chalk.blue('Bob: '), runtime['account_store'].get('Bob'));
+console.log(chalk.blue('Alice: '), runtime['account_store'].get(init_wallets.alice.public_key));
+console.log(chalk.blue('Bob: '), runtime['account_store'].get(init_wallets.bob.public_key));

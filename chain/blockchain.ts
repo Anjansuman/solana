@@ -20,6 +20,12 @@ export default class Blockchain extends BlockchainShape {
 
         super(block_size);
         this.block_size = block_size;
+
+        // create the genesis block
+        const genesis = block.create(undefined);
+        genesis.transactions = [];
+        this.seal_block(genesis);
+        this.chain.push(genesis);
     }
 
     public add_transaction(txn: TransactionType): void {
@@ -101,6 +107,17 @@ export default class Blockchain extends BlockchainShape {
             JSON.stringify(block.transactions);
         
         return Bun.SHA256.hash(combined_data, 'hex');
+    }
+
+    public get_recent_block_hashes(limit = 10): string[] {
+        return this.chain.slice(-limit).map(block => block.hash);
+    }
+
+    public get_recent_block_hash(): { ok: boolean, hash?: string, err?: string } {
+        const last_block = this.chain[this.chain.length - 1];
+        if(!last_block) return { ok: false, err: `Unable to find last block` };
+
+        return { ok: true, hash: last_block.hash };
     }
 
 }
