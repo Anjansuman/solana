@@ -1,7 +1,7 @@
 import BlockchainShape from "../metadata/blockchain.metadata";
 import { block } from "../services/init";
 import type BlockType from "../types/block.type";
-import type TransactionType from "../types/transaction.type";
+import { type TransactionType } from "../types/transaction.type";
 
 
 export default class Blockchain extends BlockchainShape {
@@ -50,9 +50,7 @@ export default class Blockchain extends BlockchainShape {
 
         const block_index = this.chain.findIndex(b => b.hash === block.hash);
 
-        if(!block_index) {
-            return false;
-        }
+        if(block_index === -1) return false;
 
         // the block is genesis block
         if(block_index === 0) return true;

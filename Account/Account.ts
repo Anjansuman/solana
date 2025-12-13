@@ -61,7 +61,7 @@ export default class Account {
 
     // this returns all the accounts available in account store for debugging
     public get_all(): AccountType[] {
-        return Array.from(this.store.values().map(this.deep_clone_account));
+        return Array.from(this.store.values()).map(this.deep_clone_account);
     }
 
     // this helps to remove the actual Account and make a new one to restrict further changes to the stored account

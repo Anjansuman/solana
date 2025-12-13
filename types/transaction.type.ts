@@ -12,3 +12,6 @@ export type TransactionType = {
     instructions: TransactionInstruction[],
     recentBlockhash: string,
 }
+
+export type TransferType = 
+| { type: 'transfer', amount: bigint };

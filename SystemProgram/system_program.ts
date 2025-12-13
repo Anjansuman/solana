@@ -1,9 +1,31 @@
 import type AccountType from "../types/account.type";
 import type { ProgramContext } from "../types/program-context.type";
+import type { TransactionInstruction, TransferType } from "../types/transaction.type";
 
 export default class SystemProgram {
 
-    public static readonly PROGRAM_ID = '11111111111111111111111111111111';
+    public static readonly PROGRAM_ID: string = '11111111111111111111111111111111';
+
+    public static entry(ctx: ProgramContext, ix: TransactionInstruction) {
+        const decoded: TransferType = JSON.parse(new TextDecoder().decode(ix.data));
+
+        switch (decoded.type) {
+            case 'transfer': {
+                if(!ix.accounts[0] || !ix.accounts[1]) return { ok: false, err: 'Not enough accounts provided to complete this transaction' };
+
+                return SystemProgram.transfer(
+                    ctx,
+                    ix.accounts[0]!,
+                    ix.accounts[1]!,
+                    BigInt(decoded.amount)
+                );
+            }
+
+            default:
+                return { ok: false, err: 'Unknown System Program instruction' };
+        }
+
+    }
 
     public static create_account(
         ctx: ProgramContext,

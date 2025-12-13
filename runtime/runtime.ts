@@ -1,5 +1,6 @@
 import type Account from "../Account/Account";
 import type { AccountMeta, ProgramContext } from "../types/program-context.type";
+import type { ProgramType } from "../types/program.type";
 import type { TransactionType } from "../types/transaction.type";
 
 
@@ -7,7 +8,7 @@ export default class Runtime {
 
     constructor(
         private account_store: Account,
-        private program_registry: Map<string, any>,
+        private program_registry: Map<string, ProgramType>,
     ) {}
 
     public execute_transaction(tx: TransactionType): { ok: boolean, err?: string } {
