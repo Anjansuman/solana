@@ -1,7 +1,14 @@
+import type { AccountMeta } from "./program-context.type"
 
+export type TransactionInstruction = {
+    programId: string,
+    accounts: string[],
+    data: Uint8Array,
+}
 
-export default interface TransactionType {
-    from: string,
-    to: string,
-    amount: bigint,
+export type TransactionType = {
+    signatures: string[],
+    accountMetas: AccountMeta[],
+    instructions: TransactionInstruction[],
+    recentBlockhash: string,
 }

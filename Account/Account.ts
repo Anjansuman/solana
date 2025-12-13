@@ -38,7 +38,7 @@ export default class Account {
     }
 
     // this is used to return all the accounts related to a txn
-    public load_accounts_snapshot(addresses: string): Map<string, AccountType> {
+    public load_accounts_snapshot(addresses: string[]): Map<string, AccountType> {
         const snapshot = new Map<string, AccountType>();
         for(const addr of addresses) {
             const acc = this.store.get(addr);

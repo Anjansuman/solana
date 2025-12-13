@@ -20,7 +20,7 @@ export type ProgramContext = {
     programId: string,
 
     // instructions to that invokation
-    instructions: Uint8Array,
+    instructionData: Uint8Array,
 
     // this can be used to store things like recent-block-hash, etc.
     extra?: Record<string, unknown>,
