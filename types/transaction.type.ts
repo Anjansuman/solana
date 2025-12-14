@@ -22,12 +22,5 @@ export type TransactionType = {
     signatures: SignatureEntry[],
 }
 
-export type _TransactionType = {
-    signatures: string[],
-    accountMetas: AccountMeta[],
-    instructions: TransactionInstruction[],
-    recentBlockhash: string,
-}
-
 export type TransferType = 
 | { type: 'transfer', amount: bigint };

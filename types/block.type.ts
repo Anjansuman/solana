@@ -1,4 +1,4 @@
-import type TransactionType from "./transaction.type";
+import { type TransactionType } from "./transaction.type";
 
 
 export default interface BlockType {
