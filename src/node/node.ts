@@ -13,7 +13,6 @@ import rpc_client from "../rpc/rpc.client";
 export default class Node {
 
     private node_id: number;
-    private total_nodes: number;
     private peers: Map<number, PeerType>;
 
     private slot_duration: number;
@@ -29,24 +28,24 @@ export default class Node {
     private runtime: Runtime;
 
     // for now assume that only the 3 initial nodes can become the leader, later we'll add dynamic leaders based of nodes
-    private validators: PeerType[] = [
-        { nodeId: 0, rpc: '', p2p: '' },
-        { nodeId: 1, rpc: '', p2p: '' },
-        { nodeId: 2, rpc: '', p2p: '' },
-    ]
+    private validators: PeerType[];
 
     private syncing: boolean = false;
 
     constructor(config: any) {
 
         this.node_id = config.node_id;
-        this.total_nodes = config.total_nodes;
-        this.peers = config.peers; // start with some nodes eventually add more after starting
+        this.peers = new Map<number, PeerType>(); // start with some nodes eventually add more after starting
+        if(config.bootstrap_peer) {
+            this.peers.set(config.bootstrap_peer.nodeId, config.bootstrap_peer);
+        }
+        
+        this.validators = config.validators;
 
         this.slot_duration = config.slot_duration;
-        this.current_slot = config.current_slot;
+        this.current_slot = 0;
 
-        this.mem_pool = config.mem_pool;
+        this.mem_pool = [];
 
         this.account_store = config.account_store;
         this.blockchain = config.blockchain;
@@ -110,22 +109,35 @@ export default class Node {
     }
 
     private tick_slot() {
-        if(this.is_leader(this.current_slot)) {
+        if(this.syncing){
+            this.current_slot += 1;
+            return;
+        }
+
+        if(this.is_leader(this.current_slot).ok) {
             this.produce_block();
         }
         this.current_slot += 1;
     }
 
     public receive_transaction(tx: TransactionType) {
-        if(this.is_leader(this.current_slot)) {
+        if(this.is_leader(this.current_slot).ok) {
             this.mem_pool.push(tx);
         } else {
             this.forward_to_leader(tx);
         }
     }
 
-    private is_leader(slot: number) {
-        return this.validators[slot % this.validators.length]?.nodeId === this.node_id;
+    private is_leader(slot: number): { ok: boolean, peer?: PeerType } {
+
+        if(this.syncing) return { ok: false };
+
+        const peer = this.validators[slot % this.validators.length];
+        if(!peer) throw new Error(chalk.red('ERROR: ') + 'Genesis block not found');
+
+        if(peer.nodeId === this.node_id) return { ok: true, peer: peer };
+        return { ok: false };
+
     }
 
     private produce_block() {
@@ -161,7 +173,7 @@ export default class Node {
     }
 
     private forward_to_leader(tx: TransactionType) {
-        const leader_id = this.current_slot % this.total_nodes;
+        const leader_id = this.is_leader(this.current_slot).peer?.nodeId;
 
         // 
         console.log(chalk.green('forwarding ' + this.node_id), ' tx to leader: ', leader_id);

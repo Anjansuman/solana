@@ -1,4 +1,4 @@
-import type BlockType from "../types/block.type";
+import type BlockType from "../src/types/block.type";
 
 
 export default abstract class BlockShape {

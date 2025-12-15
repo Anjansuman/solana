@@ -1,7 +1,7 @@
 import nacl from "tweetnacl";
 import type Wallet from "../helpers/wallet";
 import SystemProgram from "../SystemProgram/system_program";
-import type { TransactionMessage, TransactionType } from "../types/transaction.type";
+import type { TransactionMessage, TransactionType } from "../src/types/transaction.type";
 
 
 export default class Transaction {

@@ -1,5 +1,5 @@
-import type BlockType from "../types/block.type";
-import type TransactionType from "../types/transaction.type";
+import type BlockType from "../src/types/block.type";
+import type TransactionType from "../src/types/transaction.type";
 
 
 export default abstract class BlockchainShape {

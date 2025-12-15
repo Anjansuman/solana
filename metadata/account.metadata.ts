@@ -1,4 +1,4 @@
-import type AccountType from "../types/account.type";
+import type AccountType from "../src/types/account.type";
 
 
 export default abstract class AccountShape {

@@ -1,6 +1,6 @@
-import type AccountType from "../types/account.type";
-import type { ProgramContext } from "../types/program-context.type";
-import type { TransactionInstruction, TransferType } from "../types/transaction.type";
+import type AccountType from "../src/types/account.type";
+import type { ProgramContext } from "../src/types/program-context.type";
+import type { TransactionInstruction, TransferType } from "../src/types/transaction.type";
 
 export default class SystemProgram {
 
