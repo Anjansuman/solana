@@ -51,7 +51,8 @@ export default class Node {
         this.blockchain = config.blockchain;
         this.block = config.block;
 
-        this.program_registry = config.program_registry;
+        // this should be fetched from other nodes
+        this.program_registry = new Map<string, ProgramType>;
         this.runtime = new Runtime(
             this.account_store,
             this.program_registry,

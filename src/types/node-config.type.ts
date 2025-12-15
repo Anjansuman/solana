@@ -7,12 +7,10 @@ import type { ProgramType } from "./program.type"
 
 export type NodeConfigType = {
     node_id: number,
-    peers: Map<string, PeerType>,
-    bootstrap_peer?: PeerType,
     validators: PeerType[],
     slot_duration: number,
     account_store: Account,
     blockchain: Blockchain,
     block: Block,
-    program_registry: Map<string, ProgramType>,
+    bootstrap_peer?: PeerType,
 }

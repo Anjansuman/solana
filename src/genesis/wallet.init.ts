@@ -1,4 +1,4 @@
-import Wallet from "../helpers/wallet";
+import Wallet from "../src/helpers/wallet";
 
 
 export default function initialize_wallets(): { alice: Wallet, bob: Wallet } {

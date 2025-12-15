@@ -1,5 +1,5 @@
 import Account from "../Account/Account";
-import type Wallet from "../helpers/wallet";
+import type Wallet from "../src/helpers/wallet";
 import SystemProgram from "../SystemProgram/system_program";
 import type { ProgramType } from "../src/types/program.type";
 
