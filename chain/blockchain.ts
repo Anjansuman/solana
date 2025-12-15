@@ -88,11 +88,11 @@ export default class Blockchain extends BlockchainShape {
         }
     }
 
-    protected add_block(block: BlockType): void {
+    public add_block(block: BlockType): void {
         this.chain.push(block);
     }
 
-    protected seal_block(block: BlockType): void {
+    public seal_block(block: BlockType): void {
 
         // re-compute the hash of the current block
         block.hash = this.block_hash(block);
