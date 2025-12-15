@@ -79,7 +79,8 @@ export default class Node {
         const peer = this.pick_any_peer();
 
         const local_height = this.blockchain.chain.length - 1;
-        const blocks: BlockType[] = await rpc_client(peer.rpc).get_blocks_till_end(local_height + 1);
+        const result = await rpc_client(peer.rpc).get_blocks_till_end(local_height + 1);
+        const blocks: BlockType[] = result.blocks;
 
         for(const block of blocks) {
 

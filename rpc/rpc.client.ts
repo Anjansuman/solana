@@ -22,7 +22,7 @@ export default function rpc_client(rpc_url: string) {
 
     return {
         get_latest_block_info: () => call("getLatestBlockInfo"),
-        get_block_by_index: (index: number) => call('getBlockByIndex', index),
+        get_block_by_index: (index: number) => call('getBlock', index),
         get_blocks_till_end: (index: number) => call('getBlocksTillEnd', index),
     };
 }

@@ -67,6 +67,29 @@ export default function rpc_server(node: Node, port: number) {
                         });
                     }
 
+                    case 'getLatestBlockInfo': {
+                        const block = node.blockchain.chain.at(-1);
+                        if(!block) {
+                            return Response.json({ ok: false, err: 'Genesis block not found' });
+                        }
+                        return Response.json({
+                            ok: true,
+                            result: {
+                                block: block,
+                            },
+                        })
+                    }
+
+                    case 'getBlocksTillEnd': {
+                        const blocks = node.blockchain.chain.slice(params.index);
+                        return Response.json({
+                            ok: true,
+                            result: {
+                                blocks: blocks,
+                            },
+                        });
+                    }
+
                     default:
                         return Response.json({
                             ok: false,
