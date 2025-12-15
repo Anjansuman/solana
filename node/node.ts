@@ -19,8 +19,8 @@ export default class Node {
 
     private mem_pool: TransactionType[];
 
-    private account_store: Account;
-    private blockchain: Blockchain;
+    public account_store: Account;
+    public blockchain: Blockchain;
     private block: Block;
 
     private program_registry: Map<string, ProgramType>; // address -> program
