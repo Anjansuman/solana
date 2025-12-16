@@ -1,5 +1,6 @@
 import chalk from "chalk";
 import type Node from "../node/node";
+import type { PeerType } from "../types/peer.type";
 
 export default function p2p_server(node: Node, port: number) {
     Bun.serve({
@@ -26,8 +27,14 @@ export default function p2p_server(node: Node, port: number) {
                     }
 
                     case 'hello': {
-                        node.on_peer_hello(body.peer);
+                        const incoming_peer: PeerType = {
+                            nodeId: body.nodeId,
+                            rpc: body.rpc,
+                            p2p: body.p2p,
+                        }
+                        node.on_peer_hello(incoming_peer);
                         const existing_peers = node.get_peers();
+
                         return Response.json({
                             ok: true, 
                             result: {

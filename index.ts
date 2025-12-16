@@ -11,14 +11,20 @@ init();
 const NODE_ID = Number(process.env.NODE_ID);
 const RPC_PORT = Number(process.env.RPC_PORT);
 const P2P_PORT = Number(process.env.P2P_PORT);
+const BOOTSTRAP_P2P = process.env.BOOTSTRAP_P2P;
 
 const node_configs: NodeConfigType = {
     node_id: NODE_ID,
-    validators: [],
+    validators: [
+        { nodeId: 0, rpc: '8899', p2p: '9000' },
+        { nodeId: 1, rpc: '8898', p2p: '9001' },
+        { nodeId: 2, rpc: '8897', p2p: '9002' },
+    ],
     slot_duration: 1000,
     account_store: account,
     blockchain: blockchain,
     block: block,
+    bootstrap_p2p: BOOTSTRAP_P2P,
 }
 
 const node = new Node(node_configs);

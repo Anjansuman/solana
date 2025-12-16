@@ -31,6 +31,7 @@ export default class Node {
     private validators: PeerType[];
 
     private syncing: boolean = false;
+    private bootstrap_p2p?: string;
 
     constructor(config: any) {
 
@@ -50,6 +51,7 @@ export default class Node {
         this.account_store = config.account_store;
         this.blockchain = config.blockchain;
         this.block = config.block;
+        this.bootstrap_p2p = config.bootstrap_p2p;
 
         // this should be fetched from other nodes
         this.program_registry = new Map<string, ProgramType>;
@@ -62,16 +64,57 @@ export default class Node {
     }
 
     public async start() {
+
+        console.log(chalk.green(`NODE-${this.node_id}`), 'started');
+
+        if(this.bootstrap_p2p) {
+            await this.connect_to_bootstrap();
+        }
+
         await this.sync_ledger();
         this.start_slot_clock();
+    }
+
+    private async connect_to_bootstrap() {
+        try {
+
+            console.log(chalk.green(`NODE-${this.node_id}`), 'connecting to bootstrap');
+            
+            const res = await fetch(`${this.bootstrap_p2p}/p2p`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    type: "hello",
+                    nodeId: this.node_id,
+                    rpc: `http://node${this.node_id}:${process.env.RPC_PORT}`,
+                    p2p: `http://node${this.node_id}:${process.env.P2P_PORT}`,
+                }),
+            });
+
+            const data: any = await res.json();
+
+            if(!data.result) {
+                console.error(chalk.red('ERROR: '), `node-id: ${this.node_id} failed to make bootstrap call`); 
+                return;
+            }
+
+            this.merge_peers(data.result.peers);
+            console.log(chalk.green('CONNECTED: '), `node-id ${this.node_id} connected to bootstrap`);
+
+        } catch (error) {
+            console.error(chalk.red('ERROR: '), `node-id: ${this.node_id} failed to bootstrap`); 
+        }
     }
 
     private async sync_ledger() {
         // make the syncing ledger true to not assign this node as a leader until syncing completes
         this.syncing = true;
 
+        console.log(chalk.green(`NODE-${this.node_id}`), 'syncing ledger');
+
         if(this.peers.size === 0) {
             // genesis node
+            console.log('peer size is 0');
             this.syncing = false;
             return;
         }
@@ -134,7 +177,11 @@ export default class Node {
         if(this.syncing) return { ok: false };
 
         const peer = this.validators[slot % this.validators.length];
-        if(!peer) throw new Error(chalk.red('ERROR: ') + 'Genesis block not found');
+
+        if(!peer) {
+            console.log(chalk.red('ERROR: ') + 'Genesis block not found');
+            return { ok: false };
+        }
 
         if(peer.nodeId === this.node_id) return { ok: true, peer: peer };
         return { ok: false };
@@ -192,6 +239,7 @@ export default class Node {
 
     public get_peers() {
         const existing_peers = Array.from(this.peers.values());
+        console.log('existing peers: ', existing_peers);
         return existing_peers;
     }
 
@@ -214,7 +262,7 @@ export default class Node {
     }
 
     private pick_any_peer(): PeerType {
-        const peer = this.peers.get(0);
+        const peer = this.peers.values().next().value;
         if(!peer) throw new Error(chalk.red('ERROR: ') + 'no peers found');
         return peer;
     }

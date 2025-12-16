@@ -1,0 +1,40 @@
+version: "3.9"
+
+services:
+  node0:
+    build: .
+    container_name: node0
+    environment:
+      NODE_ID: 0
+      RPC_PORT: 8899
+      P2P_PORT: 9000
+    ports:
+      - "8899:8899"
+    networks:
+      - solana-net
+
+  node1:
+    build: .
+    container_name: node1
+    environment:
+      NODE_ID: 1
+      RPC_PORT: 8898
+      P2P_PORT: 9001
+      BOOTSTRAP_P2P: http://node0:9000
+    networks:
+      - solana-net
+
+  node2:
+    build: .
+    container_name: node2
+    environment:
+      NODE_ID: 2
+      RPC_PORT: 8897
+      P2P_PORT: 9002
+      BOOTSTRAP_P2P: http://node0:9000
+    networks:
+      - solana-net
+
+networks:
+  solana-net:
+   driver: bridge

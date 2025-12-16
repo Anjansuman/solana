@@ -12,5 +12,6 @@ export type NodeConfigType = {
     account_store: Account,
     blockchain: Blockchain,
     block: Block,
+    bootstrap_p2p?: string, // this is for discovering new node
     bootstrap_peer?: PeerType,
 }
