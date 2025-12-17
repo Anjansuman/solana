@@ -37,6 +37,16 @@ export default class Node {
 
         this.node_id = config.node_id;
         this.peers = new Map<number, PeerType>(); // start with some nodes eventually add more after starting
+
+        // adding this node into the peer-list
+        const rpc = `http://node${this.node_id}:${process.env.RPC_PORT}`;
+        const p2p = `http://node${this.node_id}:${process.env.P2P_PORT}`;
+        this.peers.set(this.node_id, {
+            nodeId: this.node_id,
+            rpc,
+            p2p,
+        });
+
         if(config.bootstrap_peer) {
             this.peers.set(config.bootstrap_peer.nodeId, config.bootstrap_peer);
         }
@@ -78,31 +88,43 @@ export default class Node {
     private async connect_to_bootstrap() {
         try {
 
-            console.log(chalk.green(`NODE-${this.node_id}`), 'connecting to bootstrap');
-            
-            const res = await fetch(`${this.bootstrap_p2p}/p2p`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    type: "hello",
-                    nodeId: this.node_id,
-                    rpc: `http://node${this.node_id}:${process.env.RPC_PORT}`,
-                    p2p: `http://node${this.node_id}:${process.env.P2P_PORT}`,
-                }),
-            });
+            let attempt = 0;
 
-            const data: any = await res.json();
+            while(attempt < 10) {
 
-            if(!data.result) {
-                console.error(chalk.red('ERROR: '), `node-id: ${this.node_id} failed to make bootstrap call`); 
-                return;
+                try {
+                    
+                    console.log(chalk.green(`NODE-${this.node_id}`), 'connecting to bootstrap');
+
+                    const res = await fetch(`${this.bootstrap_p2p}/p2p`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            type: "hello",
+                            nodeId: this.node_id,
+                            rpc: `http://node${this.node_id}:${process.env.RPC_PORT}`,
+                            p2p: `http://node${this.node_id}:${process.env.P2P_PORT}`,
+                        }),
+                    });
+
+                    const data: any = await res.json();
+
+                    if (data.ok) {
+                        this.merge_peers(data.result.peers);
+                        console.log(chalk.green('CONNECTED: '), `node-id ${this.node_id} connected to bootstrap`);
+                        return;
+                    }
+
+                } catch (error: any) {
+                    console.error(error.message);                    
+                } finally {
+                    console.log('attemp: ', attempt);
+                    attempt++;
+                    await new Promise(r => setTimeout(r, 1000));
+                }
             }
-
-            this.merge_peers(data.result.peers);
-            console.log(chalk.green('CONNECTED: '), `node-id ${this.node_id} connected to bootstrap`);
-
-        } catch (error) {
-            console.error(chalk.red('ERROR: '), `node-id: ${this.node_id} failed to bootstrap`); 
+        } catch (error: any) {
+            console.error(chalk.red('ERROR: '), `node-id: ${this.node_id} failed to bootstrap` + error.message);
         }
     }
 
@@ -112,12 +134,11 @@ export default class Node {
 
         console.log(chalk.green(`NODE-${this.node_id}`), 'syncing ledger');
 
-        if(this.peers.size === 0) {
-            // genesis node
-            console.log('peer size is 0');
-            this.syncing = false;
-            return;
+        while (this.peers.size <= 1) {
+            console.log(`NODE-${this.node_id} waiting for peers...`);
+            await new Promise(r => setTimeout(r, 1000));
         }
+
 
         const peer = this.pick_any_peer();
 
@@ -125,15 +146,15 @@ export default class Node {
         const result = await rpc_client(peer.rpc).get_blocks_till_end(local_height + 1);
         const blocks: BlockType[] = result.blocks;
 
-        for(const block of blocks) {
+        for (const block of blocks) {
 
-            if(!this.blockchain.is_valid_block(block)) {
+            if (!this.blockchain.is_valid_block(block)) {
                 throw new Error(chalk.red('ERROR: ') + 'invalid block during sync');
             }
 
-            for(const tx of block.transactions) {
+            for (const tx of block.transactions) {
                 const result = this.runtime.execute_transaction(tx);
-                if(!result.ok) {
+                if (!result.ok) {
                     throw new Error(chalk.red('ERROR: ') + 'invalid transaction during sync');
                 }
             }
@@ -145,6 +166,7 @@ export default class Node {
     }
 
     private start_slot_clock() {
+        console.log('tick slot clock started');
         this.tick_slot();
         const slot_timer = setInterval(
             () => this.tick_slot(),
@@ -153,19 +175,19 @@ export default class Node {
     }
 
     private tick_slot() {
-        if(this.syncing){
+        if (this.syncing) {
             this.current_slot += 1;
             return;
         }
 
-        if(this.is_leader(this.current_slot).ok) {
+        if (this.is_leader(this.current_slot).ok) {
             this.produce_block();
         }
         this.current_slot += 1;
     }
 
     public receive_transaction(tx: TransactionType) {
-        if(this.is_leader(this.current_slot).ok) {
+        if (this.is_leader(this.current_slot).ok) {
             this.mem_pool.push(tx);
         } else {
             this.forward_to_leader(tx);
@@ -174,28 +196,28 @@ export default class Node {
 
     private is_leader(slot: number): { ok: boolean, peer?: PeerType } {
 
-        if(this.syncing) return { ok: false };
+        if (this.syncing) return { ok: false };
 
         const peer = this.validators[slot % this.validators.length];
 
-        if(!peer) {
+        if (!peer) {
             console.log(chalk.red('ERROR: ') + 'Genesis block not found');
             return { ok: false };
         }
 
-        if(peer.nodeId === this.node_id) return { ok: true, peer: peer };
+        if (peer.nodeId === this.node_id) return { ok: true, peer: peer };
         return { ok: false };
 
     }
 
     private produce_block() {
-        if(this.mem_pool.length === 0) return;
+        if (this.mem_pool.length === 0) return;
 
         const block = this.create_block_from_last();
 
-        for(const tx of this.mem_pool) {
+        for (const tx of this.mem_pool) {
             const result = this.runtime.execute_transaction(tx);
-            if(result.ok) {
+            if (result.ok) {
                 block.transactions.push(tx);
             }
         }
@@ -210,7 +232,7 @@ export default class Node {
     private create_block_from_last() {
         const last_block = this.blockchain.chain.at(-1);
 
-        if(!last_block) {
+        if (!last_block) {
             throw new Error(chalk.red('Error: ') + 'genesis block missing');
         }
         return this.block.create(last_block);
@@ -231,7 +253,7 @@ export default class Node {
 
         // validate the txns inside the block here
 
-        if(this.blockchain.is_valid_block(block)) {
+        if (this.blockchain.is_valid_block(block)) {
             // add new block to the chain
             console.log(chalk.cyanBright('Block received: '), block.index);
         }
@@ -239,31 +261,31 @@ export default class Node {
 
     public get_peers() {
         const existing_peers = Array.from(this.peers.values());
-        console.log('existing peers: ', existing_peers);
+        console.log('return peers: ', [...existing_peers.values().map(p => p.nodeId)]);
         return existing_peers;
     }
 
     public on_peer_hello(peer_info: PeerType): { ok: boolean, err?: string } {
         const adding_peer = this.add_peer(peer_info);
-        if(adding_peer) return { ok: true };
+        if (adding_peer) return { ok: true };
         return { ok: false, err: `Peer with this node-id: ${peer_info.nodeId} already exists` };
     }
 
     public merge_peers(peer_list: PeerType[]) {
-        for(const peer of peer_list) {
+        for (const peer of peer_list) {
             this.add_peer(peer);
         }
     }
-    
+
     private add_peer(peer_info: PeerType): boolean {
-        if(this.peers.has(peer_info.nodeId)) return false;
+        if (this.peers.has(peer_info.nodeId)) return false;
         this.peers.set(peer_info.nodeId, peer_info);
         return true;
     }
 
     private pick_any_peer(): PeerType {
         const peer = this.peers.values().next().value;
-        if(!peer) throw new Error(chalk.red('ERROR: ') + 'no peers found');
+        if (!peer) throw new Error(chalk.red('ERROR: ') + 'no peers found');
         return peer;
     }
 

@@ -7,6 +7,14 @@ export default function rpc_server(node: Node, port: number) {
     Bun.serve({
         port,
         async fetch(req) {
+
+            console.log('port called');
+            console.log(req.url);
+            if(req.url.includes('health')) {
+                console.log('health checkup')
+                return new Response("ok");
+            }
+
             if(req.method !== 'POST') {
                 return new Response('RPC only supports POST requests ', { status: 405 });
             }
