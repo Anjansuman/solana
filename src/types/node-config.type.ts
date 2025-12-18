@@ -6,12 +6,11 @@ import type { ProgramType } from "./program.type"
 
 
 export type NodeConfigType = {
-    node_id: number,
-    validators: PeerType[],
+    peer_info: PeerType,
+    validators: number[],
     slot_duration: number,
     account_store: Account,
     blockchain: Blockchain,
     block: Block,
-    bootstrap_p2p?: string, // this is for discovering new node
-    bootstrap_peer?: PeerType,
+    bootstrap_p2p_url?: string, // this is for discovering new node
 }

@@ -27,13 +27,11 @@ export default function p2p_server(node: Node, port: number) {
                     }
 
                     case 'hello': {
-                        const incoming_peer: PeerType = {
-                            nodeId: body.nodeId,
-                            rpc: body.rpc,
-                            p2p: body.p2p,
-                        }
-                        node.on_peer_hello(incoming_peer);
                         const existing_peers = node.get_peers();
+                        
+                        // add the incoming peer
+                        const peer: PeerType = body.peer;
+                        node.on_peer_hello(peer);
 
                         return Response.json({
                             ok: true, 
