@@ -1,224 +1,247 @@
-import chalk from "chalk";
 import type Account from "../Account/Account";
+import type Block from "../block/block";
 import type Blockchain from "../chain/blockchain";
+import rpc_client from "../rpc/rpc.client";
 import Runtime from "../runtime/runtime";
 import type BlockType from "../types/block.type";
+import type { NodeConfigType } from "../types/node-config.type";
+import type { PeerType } from "../types/peer.type";
 import type { ProgramType } from "../types/program.type";
 import type { TransactionType } from "../types/transaction.type";
-import type Block from "../block/block";
-import type { PeerType } from "../types/peer.type";
-import rpc_client from "../rpc/rpc.client";
 
 
 export default class Node {
 
-    private node_id: number;
-    private peers: Map<number, PeerType>;
+    private peer_info: PeerType;
+    private peers: Map<number, PeerType>; // node-id -> Peer
+
+    private validators: number[];
+
+    private program_registry: Map<string, ProgramType> // programId -> Program
+
+    private mem_pool: TransactionType[];
 
     private slot_duration: number;
     private current_slot: number;
 
-    private mem_pool: TransactionType[];
-
-    public account_store: Account;
-    public blockchain: Blockchain;
+    private account_store: Account;
     private block: Block;
-
-    private program_registry: Map<string, ProgramType>; // address -> program
+    private blockchain: Blockchain;
     private runtime: Runtime;
 
-    // for now assume that only the 3 initial nodes can become the leader, later we'll add dynamic leaders based of nodes
-    private validators: PeerType[];
-
     private syncing: boolean = false;
-    private bootstrap_p2p?: string;
+    private bootstrap_p2p_url?: string;
 
-    constructor(config: any) {
+    constructor(config: NodeConfigType) {
 
-        this.node_id = config.node_id;
-        this.peers = new Map<number, PeerType>(); // start with some nodes eventually add more after starting
+        this.peer_info = config.peer_info;
+        this.peers = new Map<number, PeerType>;
+        // setting this peers info to the peers list
+        this.peers.set(this.peer_info.nodeId, this.peer_info);
 
-        // adding this node into the peer-list
-        const rpc = `http://node${this.node_id}:${process.env.RPC_PORT}`;
-        const p2p = `http://node${this.node_id}:${process.env.P2P_PORT}`;
-        this.peers.set(this.node_id, {
-            nodeId: this.node_id,
-            rpc,
-            p2p,
-        });
-
-        if(config.bootstrap_peer) {
-            this.peers.set(config.bootstrap_peer.nodeId, config.bootstrap_peer);
-        }
-        
         this.validators = config.validators;
+
+        this.program_registry = new Map<string, ProgramType>();
+
+        this.mem_pool = [];
 
         this.slot_duration = config.slot_duration;
         this.current_slot = 0;
 
-        this.mem_pool = [];
-
         this.account_store = config.account_store;
-        this.blockchain = config.blockchain;
         this.block = config.block;
-        this.bootstrap_p2p = config.bootstrap_p2p;
+        this.blockchain = config.blockchain;
 
-        // this should be fetched from other nodes
-        this.program_registry = new Map<string, ProgramType>;
         this.runtime = new Runtime(
             this.account_store,
             this.program_registry,
             this.blockchain,
         );
 
+        this.syncing = false;
+
     }
 
     public async start() {
-
-        console.log(chalk.green(`NODE-${this.node_id}`), 'started');
-
-        if(this.bootstrap_p2p) {
-            await this.connect_to_bootstrap();
+        if(this.bootstrap_p2p_url) {
+            // get data from that node
+            await this.connect_to_bootstrap(this.bootstrap_p2p_url);
         }
-
+        // sync the ledger
         await this.sync_ledger();
+        // start ticking
         this.start_slot_clock();
     }
 
-    private async connect_to_bootstrap() {
+    private async connect_to_bootstrap(bootstrap_p2p_url: string) {
         try {
 
+            // have 10 attempts
             let attempt = 0;
 
             while(attempt < 10) {
-
                 try {
-                    
-                    console.log(chalk.green(`NODE-${this.node_id}`), 'connecting to bootstrap');
 
-                    const res = await fetch(`${this.bootstrap_p2p}/p2p`, {
-                        method: "POST",
+                    const res = await fetch(`${bootstrap_p2p_url}`, {
+                        method: 'POST',
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
-                            type: "hello",
-                            nodeId: this.node_id,
-                            rpc: `http://node${this.node_id}:${process.env.RPC_PORT}`,
-                            p2p: `http://node${this.node_id}:${process.env.P2P_PORT}`,
+                            type: 'hello',
+                            peer: this.peer_info,
                         }),
                     });
-
+                    
                     const data: any = await res.json();
 
-                    if (data.ok) {
+                    if(data.ok) {
+                        // merge the peers
                         this.merge_peers(data.result.peers);
-                        console.log(chalk.green('CONNECTED: '), `node-id ${this.node_id} connected to bootstrap`);
                         return;
                     }
-
-                } catch (error: any) {
-                    console.error(error.message);                    
+                    
+                } catch (error) {
+                    console.error('attempt: ', attempt, ' failed');
                 } finally {
-                    console.log('attemp: ', attempt);
                     attempt++;
-                    await new Promise(r => setTimeout(r, 1000));
                 }
             }
-        } catch (error: any) {
-            console.error(chalk.red('ERROR: '), `node-id: ${this.node_id} failed to bootstrap` + error.message);
+            
+        } catch (error: unknown) {
+            this.handle_error(error, 'connect to bootstrap');
         }
     }
-
+    
     private async sync_ledger() {
-        // make the syncing ledger true to not assign this node as a leader until syncing completes
-        this.syncing = true;
+        try {
+            
+            this.syncing = true;
 
-        console.log(chalk.green(`NODE-${this.node_id}`), 'syncing ledger');
-
-        while (this.peers.size <= 1) {
-            console.log(`NODE-${this.node_id} waiting for peers...`);
-            await new Promise(r => setTimeout(r, 1000));
-        }
-
-
-        const peer = this.pick_any_peer();
-
-        const local_height = this.blockchain.chain.length - 1;
-        const result = await rpc_client(peer.rpc).get_blocks_till_end(local_height + 1);
-        const blocks: BlockType[] = result.blocks;
-
-        for (const block of blocks) {
-
-            if (!this.blockchain.is_valid_block(block)) {
-                throw new Error(chalk.red('ERROR: ') + 'invalid block during sync');
+            // checking if the peer size increased
+            while(this.peers.size <= 1) {
+                await new Promise(r => setTimeout(r, 1000));
             }
 
-            for (const tx of block.transactions) {
-                const result = this.runtime.execute_transaction(tx);
-                if (!result.ok) {
-                    throw new Error(chalk.red('ERROR: ') + 'invalid transaction during sync');
+            const random_peer = this.pick_random_peer();
+
+            // calculate the local height of the chain
+            const local_height = this.blockchain.chain.length - 1;
+
+            const result = await rpc_client(random_peer.rpc).get_blocks_till_end(local_height);
+            const new_blocks: BlockType[] = result.blocks;
+
+            for(const block of new_blocks) {
+
+                // check if the block is valid
+                if(!this.blockchain.is_valid_block(block)) {
+                    // don't add the block instead throw error
+                    throw new Error('invalid block during sync');
                 }
+                
+                // check if all txns inside the block are valid
+                for(const txn of block.transactions) {
+                    const result = this.runtime.execute_transaction(txn);
+                    if(!result.ok) {
+                        throw new Error('invalid transaction during sync');
+                    }
+                }
+                
+                // finally add the block to the chain
+                this.blockchain.add_block(block);
+
             }
-
-            this.blockchain.add_block(block);
+        } catch (error: unknown) {
+            this.handle_error(error, 'sync ledger');
+        } finally {
+            this.syncing = false;
         }
-
-        this.syncing = false;
     }
 
     private start_slot_clock() {
-        console.log('tick slot clock started');
         this.tick_slot();
-        const slot_timer = setInterval(
+        setInterval(
             () => this.tick_slot(),
             this.slot_duration,
         );
     }
-
-    private tick_slot() {
-        if (this.syncing) {
-            this.current_slot += 1;
-            return;
-        }
-
-        if (this.is_leader(this.current_slot).ok) {
-            this.produce_block();
-        }
-        this.current_slot += 1;
-    }
-
+    
     public receive_transaction(tx: TransactionType) {
-        if (this.is_leader(this.current_slot).ok) {
+        if(this.is_leader()) {
             this.mem_pool.push(tx);
         } else {
             this.forward_to_leader(tx);
         }
     }
+    
+    public receive_block(block: BlockType) {
+        if(this.blockchain.is_valid_block(block)) {
 
-    private is_leader(slot: number): { ok: boolean, peer?: PeerType } {
+            for(const txn of block.transactions) {
+                const result = this.runtime.execute_transaction(txn);
+                if(!result.ok) {
+                    console.log('invalid txn found in the received block');
+                    // add voting instead of returning
+                    return;
+                }
+            }
 
-        if (this.syncing) return { ok: false };
+            this.blockchain.seal_block(block);
+            this.blockchain.add_block(block);
 
-        const peer = this.validators[slot % this.validators.length];
-
-        if (!peer) {
-            console.log(chalk.red('ERROR: ') + 'Genesis block not found');
-            return { ok: false };
         }
+    }
+    
+    public get_peers(): PeerType[] {
+        const existing_peers = Array.from(this.peers.values())
+        return existing_peers;
+    }
+    
+    public on_peer_hello(peer_info: PeerType): { ok: boolean, err?: string } {
+        const adding_peer = this.add_peer(peer_info);
+        if(adding_peer) return { ok: true };
+        return { ok: false, err: `Peer with this node-id: ${peer_info.nodeId} already existis` };
+    }
+    
+    public merge_peers(peer_list: PeerType[]) {
+        for(const peer of peer_list) {
+            this.add_peer(peer);
+        }
+    }
 
-        if (peer.nodeId === this.node_id) return { ok: true, peer: peer };
-        return { ok: false };
+    private tick_slot() {
+        if(this.is_leader()) {
+            // produce block
+            this.produce_block();
+        }
+        this.current_slot += 1;
+    }
 
+    private is_leader(): boolean {
+        try {
+            // check this once, as this means if the node is syncing then don't make it the leader
+            if(this.syncing) return false;
+
+            const leading_node_id = this.validators[this.current_slot % this.validators.length];
+
+            if(!leading_node_id) throw new Error('Genesis block not found');
+
+            if(leading_node_id === this.peer_info.nodeId) return true;
+
+        } catch (error: unknown) {
+            this.handle_error(error, 'is leader');
+        } finally {
+            return false;
+        }
     }
 
     private produce_block() {
-        if (this.mem_pool.length === 0) return;
+        if(this.mem_pool.length === 0) return;
 
         const block = this.create_block_from_last();
 
-        for (const tx of this.mem_pool) {
-            const result = this.runtime.execute_transaction(tx);
-            if (result.ok) {
-                block.transactions.push(tx);
+        for(const txn of this.mem_pool) {
+            const result = this.runtime.execute_transaction(txn);
+            if(result.ok) {
+                block.transactions.push(txn);
             }
         }
 
@@ -228,65 +251,51 @@ export default class Node {
         this.broadcast_block(block);
         this.mem_pool = [];
     }
-
-    private create_block_from_last() {
-        const last_block = this.blockchain.chain.at(-1);
-
-        if (!last_block) {
-            throw new Error(chalk.red('Error: ') + 'genesis block missing');
-        }
-        return this.block.create(last_block);
-    }
-
+    
     private broadcast_block(block: BlockType) {
-        console.log(chalk.yellow('Broadcast: '), block.index);
+        // handle broadcasting here
+        console.log('broadcasting: ', block.index);
     }
-
+    
     private forward_to_leader(tx: TransactionType) {
-        const leader_id = this.is_leader(this.current_slot).peer?.nodeId;
-
-        // 
-        console.log(chalk.green('forwarding ' + this.node_id), ' tx to leader: ', leader_id);
+        // forward this txn to leader
+        console.log('forwarding txn');
     }
+    
+    private create_block_from_last(): BlockType {
+        try {
+            
+            const last_block = this.blockchain.chain.at(-1);
 
-    public receive_block(block: BlockType) {
+            if(!last_block) throw new Error('Genesis block not found');
 
-        // validate the txns inside the block here
+            const new_block = this.block.create(last_block);
 
-        if (this.blockchain.is_valid_block(block)) {
-            // add new block to the chain
-            console.log(chalk.cyanBright('Block received: '), block.index);
+            return new_block;
+
+        } catch (error: unknown) {
+            this.handle_error(error, 'create block from last') 
+            // this is not how you should handle the error
+            return this.block.create();
         }
     }
-
-    public get_peers() {
-        const existing_peers = Array.from(this.peers.values());
-        console.log('return peers: ', [...existing_peers.values().map(p => p.nodeId)]);
-        return existing_peers;
-    }
-
-    public on_peer_hello(peer_info: PeerType): { ok: boolean, err?: string } {
-        const adding_peer = this.add_peer(peer_info);
-        if (adding_peer) return { ok: true };
-        return { ok: false, err: `Peer with this node-id: ${peer_info.nodeId} already exists` };
-    }
-
-    public merge_peers(peer_list: PeerType[]) {
-        for (const peer of peer_list) {
-            this.add_peer(peer);
-        }
+    
+    private pick_random_peer(): PeerType {
+        const peer = this.peers.values().next().value;
+        return peer ? peer : this.peer_info;
     }
 
     private add_peer(peer_info: PeerType): boolean {
-        if (this.peers.has(peer_info.nodeId)) return false;
+        if(this.peers.has(peer_info.nodeId)) return false;
         this.peers.set(peer_info.nodeId, peer_info);
         return true;
     }
 
-    private pick_any_peer(): PeerType {
-        const peer = this.peers.values().next().value;
-        if (!peer) throw new Error(chalk.red('ERROR: ') + 'no peers found');
-        return peer;
+    private handle_error(
+        error: unknown,
+        coming_from: string,
+    ) {
+        console.error(`error in ${coming_from}: `, error instanceof Error ? error.message : 'unknown error');
     }
 
 }

@@ -20,7 +20,7 @@ services:
       NODE_ID: 1
       RPC_PORT: 8898
       P2P_PORT: 9001
-      BOOTSTRAP_P2P: http://node0:9000
+      BOOTSTRAP_P2P_URL: http://node0:9000
     networks:
       - solana-net
 
@@ -31,7 +31,7 @@ services:
       NODE_ID: 2
       RPC_PORT: 8897
       P2P_PORT: 9002
-      BOOTSTRAP_P2P: http://node0:9000
+      BOOTSTRAP_P2P_URL: http://node0:9000
     networks:
       - solana-net
 
