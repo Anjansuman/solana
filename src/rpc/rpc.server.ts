@@ -1,7 +1,6 @@
 import chalk from "chalk";
 import Node from "../node/node";
 
-
 export default function rpc_server(node: Node, port: number) {
 
     Bun.serve({

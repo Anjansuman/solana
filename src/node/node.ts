@@ -24,9 +24,9 @@ export default class Node {
     private slot_duration: number;
     private current_slot: number;
 
-    private account_store: Account;
+    public readonly account_store: Account;
     private block: Block;
-    private blockchain: Blockchain;
+    public readonly blockchain: Blockchain;
     private runtime: Runtime;
 
     private syncing: boolean = false;
@@ -165,6 +165,7 @@ export default class Node {
     }
     
     public receive_transaction(tx: TransactionType) {
+        console.log('transaction received');
         if(this.is_leader()) {
             this.mem_pool.push(tx);
         } else {
