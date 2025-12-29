@@ -1,7 +1,7 @@
 import init, { account, block, blockchain } from "./src/services/init";
 import Node from "./src/node/node";
-import p2p_server from "./src/p2p/p2p.server";
-import rpc_server from "./src/rpc/rpc.server";
+import p2p_server from "./src/server/p2p.server";
+import rpc_server from "./src/server/rpc.server";
 import type { NodeConfigType } from "./src/types/node-config.type";
 
 init();
